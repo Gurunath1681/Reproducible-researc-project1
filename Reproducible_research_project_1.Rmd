@@ -1,0 +1,145 @@
+---
+title: "Reproducible Research Project 1"
+author: "Guru"
+date: "August 25, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Introduction
+
+In this assignment, data from a personal activity monitoring device is analyzed. 5 minute interval data for a test subject over a two-month period from the device is processed. 
+
+The main objectives of the assignment are to:
+
+* Read data from a file and process it using the basic functions of R
+* Make some interesting plots and make conclusions from them
+* Create an HTML file which combines both analysis and the code used to carry out the analysis
+
+## 2. Loading and preprocessing data
+
+Loading the data and preprocessing it:
+```{r} 
+library(data.table)
+# read the data from the csv file
+activity<-fread("activity.csv")
+#Convert the date to date class
+activity$date<-as.Date(activity$date)
+
+```
+
+## 3. Mean total number of steps taken per day
+
+The following is the distribution of the number of steps of the test subject over a period of 2 months
+```{r}
+#Segregating the activity data date-wise
+activity_datewise <- aggregate(steps~date, data=activity, FUN=sum, na.rm=TRUE)
+#Histogram of the total number of steps taken each day
+hist(activity_datewise$steps, xlab="Total steps", main = "Total steps over a period of two months")
+
+```
+
+It can be seen that the distribution is a centered one. The tails of the distribution seem to die down similar to a normal distrbution.The mean and the median of the distribution are:
+
+* mean = 
+```{r}
+#Mean and median number of steps taken each day
+mean(activity_datewise$steps)
+```
+
+* median =
+```{r}
+#Mean and median number of steps taken each day
+median(activity_datewise$steps)
+```
+
+It can be seen that the mean and the median are very close indicating that the distribution is a centered one. 
+
+## 4. Average daily activity pattern
+
+Now let us look at the daily activity pattern of the person. Below is the time series plot of the average number of steps taken by the test subject across all days:
+
+```{r}
+#Time series plot of the average number of steps taken
+interval_avg <- tapply(activity$steps, activity$interval, mean, na.rm=TRUE)
+plot(interval_avg,type="l",xlab="5-min-interval",ylab="Average steps across all days")
+```
+
+It can be seen that the first few hours of the daily activity of the subject has the maximum number of steps indicating the most active period of the subject. The 5-minute interval when the subject makes the maximum number of steps is:
+
+```{r}
+#5-min interval with max number of steps
+names(interval_avg[interval_avg==max(interval_avg)])
+```
+
+## 5. Imputing missing values
+The data has many missing values indicated as NAs in the data file. The number of missing vales are:
+```{r}
+# Total number of missing data
+sum(is.na(activity))
+```
+
+Let us see what happens if we replace these missing values by the mean of the number of steps in the corresponding 5-min interval over the two-month period.
+
+```{r}
+# replace NA values with the mean of the corresponding 5-min interval
+interval_avg_df<-data.table(interval=names(interval_avg), avg=interval_avg)
+interval_avg_df$interval<-as.integer(interval_avg_df$interval)
+mod_data<-merge(activity,interval_avg_df,by=intersect(names(activity),names(interval_avg_df)))
+rows_na<-which(is.na(mod_data),arr.ind=TRUE)
+for (i in 1:nrow(rows_na)){
+  mod_data$steps[rows_na[i]]=mod_data$avg[rows_na[i]]
+}
+```
+
+To compare the original data and the modified data, let's plot the date-wise distribution of the two data sets.
+```{r}
+activity_datewise_mod <- aggregate(steps~date, data=mod_data, FUN=sum, na.rm=TRUE)
+hist(activity_datewise$steps, xlab="Total steps", main = "Total steps over a period of two months")
+hist(activity_datewise_mod$steps, xlab="Total steps", main = "Total steps over a period of two months for modified data")
+```
+It can be seen that there are minor differences between the two distributions. Here are the mean and the median of the two data sets.
+
+```{r}
+mean(activity_datewise$steps)
+mean(activity_datewise_mod$steps)
+median(activity_datewise$steps)
+median(activity_datewise_mod$steps)
+```
+
+It can be seen that the mean of the two data sets did not change, while th emedian has shifted a little bit.
+
+## 6. Differences in activity patterns between weekdays and weekends
+Now, let's look at the difference in activities over week days and weekends. Let's segregate the data according to the weekdays and weekends.
+
+```{r}
+activity$day<-weekdays(activity$date)
+for (i in 1:nrow(activity)){
+  if(activity$day[i]=="Monday" || activity$day[i]=="Tuesday" || activity$day[i]=="Wednesday" || activity$day[i]=="Thursday" || activity$day[i]=="Friday"){
+    activity$day[i]="weekday"
+  }else{
+    activity$day[i]="weekend"
+  }
+}
+activity_weekday<-activity[activity$day=="weekday"]
+activity_weekend<-activity[activity$day=="weekend"]
+```
+
+Making a comparison plot between the weekend and weekday data:
+
+```{r}
+interval_avg_weekday <- tapply(activity_weekday$steps, activity_weekday$interval, mean, na.rm=TRUE)
+interval_avg_weekend <- tapply(activity_weekend$steps, activity_weekend$interval, mean, na.rm=TRUE)
+
+par(mfrow = c(2, 1))
+par(cex = 0.6)
+par(mar = c(4, 4, 0, 0), oma = c(1, 1, 0, 0))
+plot(interval_avg_weekday,type="l",xlab="5-min-interval",ylab="Avg steps(weekdays)",ylim=c(0,250))
+plot(interval_avg_weekend,type="l",xlab="5-min-interval",ylab="Avg steps(weekend)",ylim=c(0,250))
+```
+
+It can be seen from the plot that the acticity levels of the test subject are different between weekends and weekdays as one would expect. In the weekends the activity levels are lower and are more or less uniform over the entire day. However for the weekdays, there is maximum activity in the earlier half of the day than the later.
+
